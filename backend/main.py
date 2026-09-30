@@ -81,8 +81,14 @@ MIRROR_VIEW = True          # flip the preview like a mirror (more natural for t
 MODEL_COMPLEXITY = 1        # 0 = fastest, 1 = default, 2 = most accurate. Drop to 0 if laggy.
 MIN_DETECTION_CONF = 0.5
 MIN_TRACKING_CONF = 0.5
+<<<<<<< HEAD
+MIN_VISIBILITY = 0.4        # ignore a landmark when MediaPipe is less sure than this
+SIGNAL_SMOOTHING = 0.5      # EMA weight of the newest value (1.0 = no smoothing, lower = smoother)
+DEBUG_HINTS = True             # show "hips/feet not in frame" hints on screen
+=======
 MIN_VISIBILITY = 0.5        # ignore a landmark when MediaPipe is less sure than this
 SIGNAL_SMOOTHING = 0.5      # EMA weight of the newest value (1.0 = no smoothing, lower = smoother)
+>>>>>>> 141742bef4e9f741f884417b472b6c97997cbeb6
 FEEDBACK_SECONDS = 1.5      # how long the GOOD/SHALLOW banner stays on screen
 
 # --- auto-detection tuning ---
@@ -100,8 +106,13 @@ TORSO_UPRIGHT_MAX_TILT = 35       # deg from vertical: torso counts as upright b
 TORSO_HORIZONTAL_MIN_TILT = 55    # deg from vertical: torso counts as horizontal (push-up) above this
 LUNGE_STAGGER_MIN = 0.7           # horizontal gap between ankles / torso length: >= lunge, < squat
 FOOT_LIFT_MIN = 0.15              # ankle height difference / torso length: above = one foot lifted
+<<<<<<< HEAD
+CURL_UPPER_ARM_MAX = 50           # deg: upper arm hanging (hip-shoulder-elbow angle) for a curl
+PRESS_UPPER_ARM_MIN = 20          # deg: upper arm raised away from the body for a press
+=======
 CURL_UPPER_ARM_MAX = 40           # deg: upper arm hanging (hip-shoulder-elbow angle) for a curl
 PRESS_UPPER_ARM_MIN = 30          # deg: upper arm raised away from the body for a press
+>>>>>>> 141742bef4e9f741f884417b472b6c97997cbeb6
 STRAIGHT_ARM_MIN = 140            # deg: elbow angle that counts as a straight arm (lateral raise)
 # =============================================================================
 
@@ -145,7 +156,12 @@ class PoseFrame:
             v = None
             if self.lm is not None:
                 p = self.lm[LM[part][SIDES.index(side)]]
+<<<<<<< HEAD
+                # skip low-confidence points AND points MediaPipe 'guesses' outside the frame
+                if p.visibility >= MIN_VISIBILITY and -0.08 <= p.x <= 1.08 and -0.08 <= p.y <= 1.08:
+=======
                 if p.visibility >= MIN_VISIBILITY:
+>>>>>>> 141742bef4e9f741f884417b472b6c97997cbeb6
                     # pixel coords (not normalized) so angles aren't distorted by aspect ratio
                     v = (p.x * self.w, p.y * self.h)
             self._pts[key] = v
@@ -164,8 +180,21 @@ class PoseFrame:
         return self.angle(side, "shoulder", "elbow", "wrist")
 
     def shoulder_angle(self, side):
+<<<<<<< HEAD
+        """Upper arm vs torso: ~10 deg arm hanging, ~90 deg arm out to the side.
+        If the hips are out of frame (close to the camera) it measures against straight
+        down instead, so arm exercises still work with only the upper body visible."""
+        a = self.angle(side, "hip", "shoulder", "elbow")
+        if a is not None:
+            return a
+        sh, el = self.pt("shoulder", side), self.pt("elbow", side)
+        if sh is None or el is None:
+            return None
+        return calc_angle((sh[0], sh[1] + 100.0), sh, el)
+=======
         """Upper arm vs torso: ~10 deg arm hanging, ~90 deg arm out to the side."""
         return self.angle(side, "hip", "shoulder", "elbow")
+>>>>>>> 141742bef4e9f741f884417b472b6c97997cbeb6
 
     def torso_vec(self):
         """Average hip->shoulder vector over the sides where both are visible."""
@@ -245,7 +274,13 @@ def m_knee_height(P, s):           # (knee below hip) / torso: standing ~0.8 -> 
 # -----------------------------------------------------------------------------
 def _upright(P):
     t = P.torso_tilt()
+<<<<<<< HEAD
+    if t is None:      # hips not visible (upper-body-only frame): assume upright if a shoulder is seen
+        return P.pt("shoulder", "left") is not None or P.pt("shoulder", "right") is not None
+    return t <= TORSO_UPRIGHT_MAX_TILT
+=======
     return t is not None and t <= TORSO_UPRIGHT_MAX_TILT
+>>>>>>> 141742bef4e9f741f884417b472b6c97997cbeb6
 
 
 def h_upright(P, s):               # hold check: torso upright
@@ -328,7 +363,11 @@ EXERCISES = {
         "shallow_msg": "go deeper",
     },
     "lunge": {
+<<<<<<< HEAD
+        "measure": m_knee_angle, "gate": g_lunge, "hold": h_upright, "joints": ("hip", "knee", "ankle"),
+=======
         "measure": m_knee_angle, "gate": g_lunge, "joints": ("hip", "knee", "ankle"),
+>>>>>>> 141742bef4e9f741f884417b472b6c97997cbeb6
         "rest_state": "standing", "active_state": "lunging",
         "enter_below": 140, "exit_above": 160, "good_below": 105, "min_drop": 20,
         "shallow_msg": "sink lower",
@@ -342,7 +381,11 @@ EXERCISES = {
     "bicep_curl": {
         "measure": m_elbow_angle, "gate": g_curl, "joints": ("shoulder", "elbow", "wrist"),
         "rest_state": "extended", "active_state": "curling",
+<<<<<<< HEAD
+        "enter_below": 120, "exit_above": 140, "good_below": 60, "min_drop": 20,
+=======
         "enter_below": 130, "exit_above": 150, "good_below": 60, "min_drop": 20,
+>>>>>>> 141742bef4e9f741f884417b472b6c97997cbeb6
         "shallow_msg": "curl higher",
     },
     "shoulder_press": {
@@ -649,6 +692,24 @@ def fmt(v):
     return f"{v:.2f}" if abs(v) < 3 else f"{v:.0f}"
 
 
+<<<<<<< HEAD
+def draw_overlay(frame, session, signals, n_clients, last_result, lm=None):
+    h, w = frame.shape[:2]
+    # tell the person WHY nothing is detected when the pose itself is the problem
+    hint = None
+    if lm is None:
+        hint = "No person found - step back so shoulders to feet are in view, light the room"
+    elif session.counter is None and DEBUG_HINTS:
+        vis = lambda i: lm[i].visibility >= MIN_VISIBILITY and 0 <= lm[i].y <= 1
+        if not (vis(23) or vis(24)):
+            hint = "Hips not in frame: arm exercises only (step back for squat/lunge/knee raise)"
+        elif not (vis(27) or vis(28)):
+            hint = "Feet not in frame: leg exercises need feet visible (step back)"
+    if hint:
+        put_text(frame, hint, (10, h - 32), 0.45, (0, 200, 255), 1)
+
+    put_text(frame, "WS clients: " + str(n_clients) + "   R = re-detect   ESC = quit",
+=======
 def draw_overlay(frame, session, signals, n_clients, last_result):
     h, w = frame.shape[:2]
     counter = session.counter
@@ -681,12 +742,17 @@ def draw_overlay(frame, session, signals, n_clients, last_result):
     put_text(frame, f"Reps: {tally.reps}", (10, 114), 0.8, (0, 255, 0))
     put_text(frame, f"Form: {tally.form_score:.1f}%", (10, 144), 0.8, (0, 255, 0))
     put_text(frame, f"WS clients: {n_clients}   R = re-detect   ESC = quit",
+>>>>>>> 141742bef4e9f741f884417b472b6c97997cbeb6
              (10, h - 12), 0.45, (200, 200, 200), 1)
 
     if last_result is not None:
         ok, msg, ts = last_result
         if time.time() - ts < FEEDBACK_SECONDS:
+<<<<<<< HEAD
+            text, color = ("GOOD REP", (0, 255, 0)) if ok else ("SHALLOW - " + msg, (0, 0, 255))
+=======
             text, color = ("GOOD REP", (0, 255, 0)) if ok else (f"SHALLOW - {msg}", (0, 0, 255))
+>>>>>>> 141742bef4e9f741f884417b472b6c97997cbeb6
             put_text(frame, text, (w // 2 - 150, h - 60), 0.9, color, 3)
 
 
@@ -775,7 +841,11 @@ def main():
                         if p is not None:
                             cv2.circle(frame, (int(p[0]), int(p[1])), 8, (0, 255, 255), -1)
 
+<<<<<<< HEAD
+                draw_overlay(frame, session, smoothed, len(server.clients), last_result, lm)
+=======
                 draw_overlay(frame, session, smoothed, len(server.clients), last_result)
+>>>>>>> 141742bef4e9f741f884417b472b6c97997cbeb6
                 cv2.imshow(window, frame)
                 key = cv2.waitKey(1) & 0xFF
                 if key == 27:                                # ESC

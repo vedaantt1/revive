@@ -1,5 +1,5 @@
 """
-Gamified Rehab Tracker - Pose Backend  (multi-exercise auto detection)
+Gamifried Rehab Tracker - Pose Backend  (multi-exercise auto detection)
 ======================================================================
 Watches the webcam, works out WHICH exercise you are doing, counts reps with
 MediaPipe Pose, judges form (range of motion), and broadcasts every counted rep
